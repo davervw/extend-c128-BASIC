@@ -1,0 +1,139 @@
+; C128 example parsing REM for variable number of byte arguments to SYS
+; because SYS syntax on C128 was changed to parse register arguments
+; e.g. SYS DEC("1300"): REM 64, 65, 66, 67, 68, 69, 70
+
+display_characters:
+. 01300  a0 00    ldy #$00    ; init
+. 01302  b1 3d    lda ($3d),y ; get current token
+. 01304  c9 3a    cmp #$3a    ; colon?
+. 01306  d0 20    bne $1328   ; branch if not colon - jmp_syntax_error
+. 01308  20 80 03 jsr $0380   ; get next token
+. 0130b  c9 8f    cmp #$8f    ; REM?
+. 0130d  d0 19    bne $1328   ; branch if not REM - jmp_syntax_error
+. 0130f  20 80 03 jsr $0380   ; get next token
+. 01312  20 f4 87 jsr $87f4   ; getbyt - if parses correctly returns value in x register, otherwise exits with error
+. 01315  08       php         ; save flags
+. 01316  48       pha         ; save next token
+. 01317  20 2b 13 jsr $132b   ; call display_character
+. 0131a  68       pla         ; restore token
+. 0131b  28       plp         ; restore flags
+. 0131c  d0 01    bne $131f   ; branch if more to do
+. 0131e  60       rts         ; end of statement, return to BASIC interpreter
+. 0131f  c9 2c    cmp #$2c    ; comma?
+. 01321  d0 05    bne $1328   ; branch if not comma - jmp_syntax_error
+. 01323  20 80 03 jsr $0380   ; get next token
+. 01326  d0 ea    bne $1312   ; loop if more tokens, otherwise fall through to next statement for syntax error
+
+jmp_syntax_error:
+. 01328  4c 5b 8b jmp $8b5b   ; display Syntax Error
+
+display_character:
+. 0132b  ad 00 ff lda $ff00   ; retieve MMU Configuration Register
+. 0132e  48       pha         ; save MMU CR
+. 0132f  a9 00    lda #$00    ; 00 = BANK 15
+. 01331  8d 00 ff sta $ff00   ; switch to BANK 15
+. 01334  8a       txa         ; move parameter to A register
+. 01335  20 d2 ff jsr $ffd2   ; output character to stdout (normally screen)
+. 01338  68       pla         ; restore MMU CR
+. 01339  8d 00 ff sta $ff00   ; apply original MMU CR
+. 0133c  60       rts         ; done with subroutine
+
+poke_bytes:
+. 0133d  a0 00    ldy #$00    ; init
+. 0133f  b1 3d    lda ($3d),y ; get current token
+. 01341  c9 3a    cmp #$3a    ; colon?
+. 01343  d0 e3    bne $1328   ; branch if not colon - jmp_syntax_error
+. 01345  20 80 03 jsr $0380   ; get next token
+. 01348  c9 8f    cmp #$8f    ; REM?
+. 0134a  d0 dc    bne $1328   ; branch if not REM - jmp_syntax_error
+. 0134c  20 80 03 jsr $0380   ; get next token
+. 0134f  20 ef 77 jsr $77ef   ; frmeval - evaluate expression (in REM appears to only evaluate one term)
+. 01352  20 15 88 jsr $8815   ; getadr - convert/validate FAC into 0..65535 A high, Y low
+. 01355  85 fc    sta $fc     ; store high in ($fb) ptr
+. 01357  84 fb    sty $fb     ; store low in ($fb) ptr
+. 01359  a0 00    ldy #$00    ; init
+. 0135b  b1 3d    lda ($3d),y ; get current token
+. 0135d  c9 2c    cmp #$2c    ; comma?
+. 0135f  d0 14    bne $1375   ; branch if not comma - done
+. 01361  20 80 03 jsr $0380   ; get next token
+. 01364  20 f4 87 jsr $87f4   ; getbyt - returns in X register
+. 01367  8a       txa         ; transfer result to A register
+. 01368  a0 00    ldy #$00    ; init
+. 0136a  91 fb    sta ($fb),y ; store byte at ($fb) ptr
+. 0136c  e6 fb    inc $fb     ; increment pointer low
+. 0136e  d0 02    bne $1372   ; branch if no overflow
+. 01370  e6 fc    inc $fc     ; increment pointer high (only if pointer overflow)
+. 01372  4c 59 13 jmp $1359   ; loop for more bytes
+. 01375  60       rts         ; done
+
+reverse_string:
+. 01376  a0 00    ldy #$00    ; init
+. 01378  b1 3d    lda ($3d),y ; get current token
+. 0137a  c9 3a    cmp #$3a    ; colon?
+. 0137c  d0 aa    bne $1328   ; branch if not colon - jmp_syntax_error
+. 0137e  20 80 03 jsr $0380   ; get next token
+. 01381  c9 8f    cmp #$8f    ; REM?
+. 01383  d0 a3    bne $1328   ; branch if not REM - jmp_syntax_error
+. 01385  20 80 03 jsr $0380   ; get next token
+. 01388  20 ef 77 jsr $77ef   ; frmeval - evaluate expression (in REM appears to only evaluate one term)
+. 0138b  24 0f    bit $0f     ; check type
+. 0138d  10 99    bpl $1328   ; branch if numeric - jmp_syntax_error (todo: type mismatch error)
+. 0138f  a9 0f    lda #$0f    ; bank 15
+. 01391  a2 7e    ldx #$7e    ; <$877e - FRESTR
+. 01393  a0 87    ldy #$87    ; >$877e - FRESTR
+. 01395  85 02    sta $02     ; store bank
+. 01397  86 04    stx $04     ; store routine low address
+. 01399  84 03    sty $03     ; store routine high address
+. 0139b  a9 00    lda #$00    ; clear flags
+. 0139d  85 05    sta $05     ; store flags
+. 0139f  a9 00    lda #$00    ; bank 15 value for MMU Configuration Register
+. 013a1  8d 00 ff sta $ff00   ; set MMU CR
+. 013a4  20 6e ff jsr $ff6e   ; JSRFAR
+. 013a7  a9 00    lda #$00    ; bank 15 value for MMU Configuration Register
+. 013a9  8d 00 ff sta $ff00   ; set MMU CR (suspect was Bank 1 or similar)
+. 013ac  a6 07    ldx $07     ; retrieve .X returned by frestr (low address) 
+. 013ae  a4 08    ldy $08     ; retrieve .Y returned by frestr (high address)
+. 013b0  86 fb    stx $fb     ; save low address in ($fb) pointer
+. 013b2  84 fc    sty $fc     ; save high address in ($fb) pointer
+. 013b4  a5 06    lda $06     ; get .A (string length)
+. 013b6  f0 1b    beq $13d3   ; branch if empty string - done
+. 013b8  a8       tay         ; move length to .Y
+. 013b9  88       dey         ; decrement to point to last character
+. 013ba  a9 12    lda #$12    ; control code reverse on
+. 013bc  20 d2 ff jsr $ffd2   ; output control code reverse on
+. 013bf  a9 fb    lda #$fb    ; load zp pointer address ($fb)
+. 013c1  a2 01    ldx #$01    ; bank 1 is variables, string storage
+. 013c3  20 74 ff jsr $ff74   ; fetch from any bank, returns .A
+. 013c6  20 d2 ff jsr $ffd2   ; chrout
+. 013c9  88       dey         ; decrement offset
+. 013ca  c0 ff    cpy #$ff    ; done?
+. 013cc  d0 f1    bne $13bf   ; loop while not done
+. 013ce  a9 92    lda #$92    ; control code reverse off
+. 013d0  20 d2 ff jsr $ffd2   ; chrout
+. 013d3  60       rts         ; done
+
+>C:1300  a0 00 b1 3d  c9 3a d0 20  20 80 03 c9  8f d0 19 20
+>C:1310  80 03 20 f4  87 08 48 20  2b 13 68 28  d0 01 60 c9
+>C:1320  2c d0 05 20  80 03 d0 ea  4c 5b 8b ad  00 ff 48 a9
+>C:1330  00 8d 00 ff  8a 20 d2 ff  68 8d 00 ff  60 a0 00 b1
+>C:1340  3d c9 3a d0  e3 20 80 03  c9 8f d0 dc  20 80 03 20
+>C:1350  ef 77 20 15  88 85 fc 84  fb a0 00 b1  3d c9 2c d0
+>C:1360  14 20 80 03  20 f4 87 8a  a0 00 91 fb  e6 fb d0 02
+>C:1370  e6 fc 4c 59  13 60 a0 00  b1 3d c9 3a  d0 aa 20 80
+>C:1380  03 c9 8f d0  a3 20 80 03  20 ef 77 24  0f 10 99 a9
+>C:1390  0f a2 7e a0  87 85 02 86  04 84 03 a9  00 85 05 a9
+>C:13a0  00 8d 00 ff  20 6e ff a9  00 8d 00 ff  a6 07 a4 08
+>C:13b0  86 fb 84 fc  a5 06 f0 1b  a8 88 a9 12  20 d2 ff a9
+>C:13c0  fb a2 01 20  74 ff 20 d2  ff 88 c0 ff  d0 f1 a9 92
+>C:13d0  20 d2 ff 60  00 00 00 00  00 00 00 00  00 00 00 00
+
+1 data a000b13dc93ad020208003c98fd01920800320f4870848202b136828d00160c92cd005208003d0ea4c5b8bad00ff48a9008d00ff8a20d2ff688d00ff60a000b13dc93ad0e3208003c98fd0
+2 data dc20800320ef7720158885fc84fba000b13dc92cd01420800320f4878aa00091fbe6fbd002e6fc4c591360a000b13dc93ad0aa208003c98fd0a320800320ef77240f1099a90fa27ea08785
+3 data 0286048403a9008505a9008d00ff206effa9008d00ffa607a40886fb84fca506f01ba888a91220d2ffa9fba2012074ff20d2ff88c0ffd0f1a99220d2ff60000000000000000000000000,*
+4 i=dec("1300"):graphic0,1:print:fast
+6 readh$:ifh$="*"thenslow:goto20
+7 do:pokei,dec(left$(h$,2)):i=i+1:h$=right$(h$,len(h$)-2):loopuntilh$="":goto6
+20 sys dec("133d"):rem 1024,129,130,131
+30 sys dec("1300"):rem 48,49,50
+40 sys dec("1376"):rem "hello"
+50 list:rem copyright(c)2026 davevw.com
