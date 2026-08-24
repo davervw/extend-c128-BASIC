@@ -2,6 +2,8 @@
 
 Samples on how to extend C128 BASIC syntax simply with 8502/6502 assembly.  
 
+Link: [blog entry](https://techwithdave.davevw.com/2026/08/extending-c128-basic-using-rem.html)
+
 On the C64 we could parse for commas and numbers, but the C128 SYS command already does that for populating the registers.  Using :REM ... we can specify parameters in a C128 syntax compatible way that is similar yet necessarily different.
 
 In the following example(*) parameters are passed to machine language routines via remarks.  The REM statements and arguments are required or running would produce a syntax error. 
