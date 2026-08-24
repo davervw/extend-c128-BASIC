@@ -25,4 +25,4 @@ example:
 
 credit: [8bitshowandtell](https://www.youtube.com/c/8BitShowAndTell) did a video where a similar technique was shown like [RUN:123](https://youtu.be/mWemSlH0Xrg?si=oDUKyhV7mPzJ1_4b) command.   That was for a different purpose, but was inspiration for this extension exerciese.
 
-Reimplemented without referring to the video, making sure could handle bytes, words (0..65535), and strings.  Exercise left to the developer to parse and use floating point numbers, and signed integers (-32768..32767).   Code was hand assembled in C128 monitor and VICE monitor.
+Reimplemented without referring to the video, making sure could handle bytes, words (0..65535), and strings.  Exercise left to the developer to parse and use floating point numbers, and signed integers (-32768..32767).   Code was hand assembled in C128 monitor and VICE monitor.  These are necessary alternatives to the techniques shown in the repository [extend-c64-BASIC](https://github.com/davervw/extend-c64-BASIC)
